@@ -9,15 +9,15 @@ clear all;close all;
 %96 well ids
 wellvec={'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
 %params
-slashtype='\';
-batchlength = 4;
+slashtype='/';
+batchlength = 1;
 
 %inputdir
 for j1=batchlength
     
     %For running directories in batch mode
     if j1==1
-        inputdir=['F:\Dhruv\Girish\70714\VAP GFP\24 hour\MFGTMP_140617200002']; %#ok<*NBRAK>        
+        inputdir=['/Users/bramalingam/Downloads/A01_temp_balaji']; %#ok<*NBRAK>        
     elseif j1==2
         inputdir=['F:\Dhruv\Girish\70714\VAP GFP\36 hour\MFGTMP_140618110001'];
     elseif j1==3
@@ -36,20 +36,16 @@ for j1=batchlength
     reader = bfopen(filepath);
     
     welldatamat=[];namevec={};
-    for i=1:3:length(reader)
-        %Counters:
-        ctr_gfp=i;
-        ctr_dapi=i+2;
+    for i=1:length(reader)
         
         %Read GFP
-        series1 = reader{ctr_gfp,1};
-        gfp1=series1{1,1};
+        series1 = reader{i,1};
+        gfp1=series1{2,1};
         gfp=double(imtophat(gfp1,strel('disk',12)));
         
         %Read DAPI
-        series2 = reader{ctr_dapi,1};
-        dapi=series2{1,1}; %corrected read location
-        
+        dapi=series1{1,1}; %corrected read location
+
         %wellID
         wellsrch='Well ';
         metadata=series1{1,2};
@@ -57,7 +53,7 @@ for j1=batchlength
         wellid=metadata(idx1(end)+length(wellsrch):idx1(end)+length(wellsrch)+2);         
         wellx=strmatch(wellid(1),wellvec,'exact'); %#ok<*MATCH3>
         welly=str2double(wellid(2:3));
-        
+        keyboard
         %FieldID
         fieldsrch='Field #';
         idx2=findstr(fieldsrch,metadata);

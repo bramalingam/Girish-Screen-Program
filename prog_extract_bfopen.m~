@@ -1,60 +1,66 @@
 %Screen : Girish's Screen (VAP aggregation at 24,36 and 48 hours)
 %Author : Balaji
-%Last edited : 26/07/2013
+%Last edited : 04/07/2014
 
 %Init
-% clear all;close all;
+clear all;close all;
 
 %Params
 %96 well ids
-wellvec={'A','B','C','D','E','F','G','H'};
+wellvec={'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
 %params
 slashtype='/';
+batchlength = 1;
 
 %inputdir
-for j1=1
+for j1=batchlength
+    
+    %For running directories in batch mode
     if j1==1
-        inputdir=['/Users/bramalingam/Dropbox/For Balaji/PRM GFP/24 hour/MFGTMP_140618000002'];
-        resultmat='.mat';
-    elseif j1==2;
-        inputdir=['G:\Balaji _ Shared E\Shared E\CCamp\Girish Screen\Images\140813_36hrs'];
-        resultmat='Plate1_36_170913_hours.mat';
-    else
-        inputdir=['G:\Balaji _ Shared E\Shared E\CCamp\Girish Screen\Images\140813_48hrs'];
-        resultmat='Plate1_48_170913_hours.mat';
+        inputdir=['/Users/bramalingam/Downloads/A01_temp_balaji']; %#ok<*NBRAK>        
+    elseif j1==2
+        inputdir=['F:\Dhruv\Girish\70714\VAP GFP\36 hour\MFGTMP_140618110001'];
+    elseif j1==3
+        inputdir=['F:\Dhruv\Girish\70714\PRM GFP\24 hour\MFGTMP_140618000002'];
+    elseif j1==4
+        inputdir=['F:\Dhruv\Girish\70714\PRM GFP\36 hour\MFGTMP_140618120001'];
     end
+    
+    %Resultmat
+    idx1=findstr(slashtype,inputdir); %#ok<*FSTR>
+    resultmat = [inputdir(idx1(end)+1:end) '.mat'];
     
     %path
     filepath=fuf([inputdir slashtype '*.C01'],'detail');
-    filepath=filepath{1};
-%     reader = bfopen(filepath);
+    filepath=filepath{1}; 
+    reader = bfopen(filepath);
     
     welldatamat=[];namevec={};
-    for i=90:100;
-
+    for i=1:length(reader)
+        
         %Read GFP
         series1 = reader{i,1};
-        gfp1=series1{1,1};
+        gfp1=series1{2,1};
         gfp=double(imtophat(gfp1,strel('disk',12)));
         
         %Read DAPI
-        dapi=series1{3,1};
-        
+        dapi=series1{1,1}; 
+
         %wellID
         wellsrch='Well ';
         metadata=series1{1,2};
         idx1=findstr(wellsrch,metadata);
         wellid=metadata(idx1(end)+length(wellsrch):idx1(end)+length(wellsrch)+2);         
-        wellx=strmatch(wellid(1),wellvec,'exact');
-        welly=str2num(wellid(2:3));
-        
+        wellx=strmatch(wellid(1),wellvec,'exact'); %#ok<*MATCH3>
+        welly=str2double(wellid(2:3));
+        keyboard
         %FieldID
         fieldsrch='Field #';
         idx2=findstr(fieldsrch,metadata);
-        fieldnumber=str2num(metadata(idx2(end)+length(fieldsrch):idx2(end)+length(fieldsrch)+1));
+        fieldnumber=str2double(metadata(idx2(end)+length(fieldsrch):idx2(end)+length(fieldsrch)+1));
 
         %Threshold dapi
-        [aa ii]=kmeans(double(dapi(:)),3,'emptyaction','singleton');
+        [aa,ii]=kmeans(double(dapi(:)),3,'emptyaction','singleton');
         linvec1=dapi(:);
         threshvec=[min(linvec1(aa==1)) min(linvec1(aa==2)) min(linvec1(aa==3))];       
         img1=dapi>max(threshvec);
