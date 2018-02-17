@@ -9,90 +9,110 @@ clear all;close all;
 %96 well ids
 wellvec={'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'};
 %params
+masterdir = '/Users/bramalingam/Google Drive';
 slashtype='/';
-batchlength = 1;
-
-%inputdir
-for j1=batchlength
-    
-    %For running directories in batch mode
-    if j1==1
-        inputdir=['/Users/bramalingam/Downloads/A01_temp_balaji']; %#ok<*NBRAK>        
-    elseif j1==2
-        inputdir=['F:\Dhruv\Girish\70714\VAP GFP\36 hour\MFGTMP_140618110001'];
-    elseif j1==3
-        inputdir=['F:\Dhruv\Girish\70714\PRM GFP\24 hour\MFGTMP_140618000002'];
-    elseif j1==4
-        inputdir=['F:\Dhruv\Girish\70714\PRM GFP\36 hour\MFGTMP_140618120001'];
+timepoints = {'24 HRS' '36 HRS'};
+subdirec = dir ([masterdir slashtype 'Plate*']);
+cntr = 1;
+for i = 1:length(subdirec)
+    platedir = [subdirec(i).folder slashtype subdirec(i).name];
+    for j = 1:2
+       timedir = [platedir slashtype timepoints{j}];
+       platenamedir = dir([timedir slashtype 'MFGTMP_*']);
+       platenamedir = [platenamedir.folder slashtype platenamedir.name];
+       inputdirvec{cntr,1} = platenamedir; %#ok<*SAGROW>
+       platename = subdirec(i).folder
+       cntr = cntr + 1;
     end
+end
+
+
+batchlength = 1;
+disks = [3 7 11];
+%inputdir
+for j1=1:length(inputdirvec)
     
+    inputdir = inputdirvec{j1};
+    if exist(inputdir) == 0
+        continue
+    end
     %Resultmat
     idx1=findstr(slashtype,inputdir); %#ok<*FSTR>
-    resultmat = [inputdir(idx1(end)+1:end) '.mat'];
-    
+    resultmat = [inputdir(idx1(end)+1:end)];
+    mkdir(resultmat)
     %path
-    filepath=fuf([inputdir slashtype '*.C01'],'detail');
-    filepath=filepath{1}; 
-    reader = bfopen(filepath);
-    
-    welldatamat=[];namevec={};
-    for i=1:length(reader)
+    filepath1=fuf([inputdir slashtype '*d0.C01'],'detail');
+     %Read GFP
+    filepath=filepath1{1}; 
+    reader = bfGetReader(filepath);
+
+    welldatamat=[];namevec={};wellcounter = 1;
+    for i=1:reader.getSeriesCount()
         
-        %Read GFP
-        series1 = reader{i,1};
-        gfp1=series1{2,1};
-        gfp=double(imtophat(gfp1,strel('disk',12)));
+        reader.setSeries(i-1)
+        gfp1= bfGetPlane(reader, 2);
+        
+        for gf = 1:length(disks)
+            gfp{gf,1} = imtophat(gfp1,strel('disk',disks(gf)));
+            gfp{gf,2} = bwlabel(imbinarize(gfp{gf,1},graythresh(gfp{gf,1})));
+        end
         
         %Read DAPI
-        dapi=series1{1,1}; 
+        dapi=bfGetPlane(reader, 1); %corrected read location
 
-        %wellID
-        wellsrch='Well ';
-        metadata=series1{1,2};
-        idx1=findstr(wellsrch,metadata);
-        wellid=metadata(idx1(end)+length(wellsrch):idx1(end)+length(wellsrch)+2);         
+        %wellID & %FieldID
+        wellsrch='_';
+        metadata = reader.getSeriesUsedFiles();
+        metadata= char(metadata(1));
+        idx1=max(findstr(wellsrch,metadata));
+        wellid = metadata(idx1+1:idx1+3);   
+        fieldnumber=str2double(metadata(idx1+5:idx1+6));
         wellx=strmatch(wellid(1),wellvec,'exact'); %#ok<*MATCH3>
         welly=str2double(wellid(2:3));
-        keyboard
-        %FieldID
-        fieldsrch='Field #';
-        idx2=findstr(fieldsrch,metadata);
-        fieldnumber=str2double(metadata(idx2(end)+length(fieldsrch):idx2(end)+length(fieldsrch)+1));
-
+        wellid_check = (wellx-1)*24 + welly;
+        if wellid_check ~= wellcounter
+            save([resultmat '/' num2str(wellcounter) '.mat'],'welldatamat','namevec');
+            welldatamat = [];
+            namevec={};
+            wellcounter = wellcounter + 1;
+        end
         %Threshold dapi
-        [aa,ii]=kmeans(double(dapi(:)),3,'emptyaction','singleton');
-        linvec1=dapi(:);
-        threshvec=[min(linvec1(aa==1)) min(linvec1(aa==2)) min(linvec1(aa==3))];       
-        img1=dapi>max(threshvec);
+        img1 = imbinarize(dapi,graythresh(dapi));
         img2=bwareaopen(bwlabel(img1),300);        
-        pixidx=intersect(find(img1==1),find(img2==0));       
+        pixidx=intersect(find(img1==1),find(img2==0));      
         finimg=zeros(size(dapi,1),size(dapi,2));
         finimg(pixidx)=1;
         finimg=imclearborder(bwareaopen(finimg,5));
-        clear img2;
+        clearvars img1 img2 pixidx;
         
-        nucleus = bwlabel(finimg);
-        centvec=regionprops(nucleus,'Centroid'); %#ok<*MRPBW>
-
-        zerovec1=zeros(size(dapi,1),size(dapi,2));
-        
-        for z=1:length(centvec)
-            
-            zerovec=zeros(size(dapi,1),size(dapi,2));
-            idx=z;
-            zerovec(round(centvec(idx).Centroid(2)),round(centvec(idx).Centroid(1)))=1;
-            zerovec=imdilate(zerovec,strel('disk',11));
-            
-            idx2=setdiff(find(zerovec>0),find(zerovec1>0));            
-            zerovec(idx2)=z;
-            zerovec1=zerovec1+zerovec;
-            disp([wellx welly fieldnumber z])
-
-            welldatamat=[welldatamat ; wellx welly fieldnumber length(idx2) mean(gfp(idx2)) sum(gfp(idx2))]; %#ok<*AGROW>
-            namevec=[namevec ; [wellid '_' num2str(fieldnumber)]];
+        nucleus = finimg;
+        nucleus = bwlabel(bwmorph(nucleus,'shrink',Inf));        
+        zerovec1=imdilate(nucleus,strel('disk',11));
+        zerovec1(finimg>0) = 0;
+        L = watershed(zerovec1);
+        clearvars finimg dapi centvec idx idx2 nucleus;
+        for idx = 1:max(L(:))
+            idx2 = find(L==idx);
+            if length(idx2)<1000
+                gfpvec = [];
+                for gf = 1:length(disks)
+                    idx3 = find(gfp{gf,2}>0);
+                    idx3 = intersect(idx2,idx3);
+                    if isempty(idx3)
+                        meanandsumvec = [0 0];
+                    else
+                        meanandsumvec = [mean(gfp{gf,1}(idx3)) sum(gfp{gf,1}(idx3))];
+                    end
+                    gfpvec = [gfpvec mean(gfp{gf,1}(idx2)) sum(gfp{gf,1}(idx2)) meanandsumvec...
+                        sum(gfp{gf,2}(idx2)>0)/length(idx2) length(unique(gfp{gf,2}(idx2)))-1];
+                end
+                welldatamat=[welldatamat ; wellx welly fieldnumber ...
+                    length(idx2)  gfpvec]; %#ok<*AGROW>
+                namevec=[namevec ; [wellid '_' num2str(fieldnumber)]];
+            end
         end
-                
+
+        disp([wellx welly fieldnumber])
     end
     
-    save(resultmat,'welldatamat','namevec');
 end
