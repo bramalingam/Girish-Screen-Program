@@ -64,6 +64,7 @@ for j1=1:length(inputdirvec)
         dapi=bfGetPlane(reader, 1); %corrected read location
 
         %wellID & %FieldID
+        dapi = imadjust(dapi);
         wellsrch='_';
         metadata = reader.getSeriesUsedFiles();
         metadata= char(metadata(1));
